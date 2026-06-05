@@ -106,7 +106,7 @@ export default function App() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: "claude-3-5-haiku-20241022",
           max_tokens: 1000,
           messages: [{ role: "user", content: prompt }],
         }),
@@ -123,8 +123,8 @@ export default function App() {
       setTimeout(() => setStep("match"), 4600);
     } catch (e) {
       console.error(e);
-      setApiError(e.message || "משהו השתבש. נסה שוב.");
-      setStep("form");
+      setApiError(e.message || "שגיאה לא ידועה");
+      setStep("error");
     }
   };
 
@@ -294,6 +294,30 @@ export default function App() {
           </button>
           {apiError && <div style={styles.errorBox}>❌ {apiError}</div>}
           <div style={styles.disclaimer}>⚠️ שירות זה הוא בדיחה בלבד. ההורים שלך אוהבים אותך גם כשאתה מעצבן.</div>
+        </div>
+      )}
+
+      {/* ERROR */}
+      {step === "error" && (
+        <div style={styles.card} className="fadeIn">
+          <div style={{ textAlign: "center", marginBottom: 16, fontSize: 48 }}>😵</div>
+          <div style={{ ...styles.cardTitle, color: "#c62828" }}>משהו השתבש</div>
+          <div style={{ ...styles.errorBox, marginBottom: 16 }}>
+            <strong>שגיאה:</strong> {apiError}
+          </div>
+          <button style={styles.btn} onClick={() => { setStep("form"); setApiError(""); }}>
+            🔄 חזור ונסה שוב
+          </button>
+          {!IS_DEV && (
+            <button style={{ ...styles.btn, background: "#888", marginTop: 10 }} onClick={() => {
+              localStorage.removeItem("anthropic_key");
+              setApiKey("");
+              setStep("form");
+              setApiError("");
+            }}>
+              🔑 שנה מפתח API
+            </button>
+          )}
         </div>
       )}
 
