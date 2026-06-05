@@ -19,6 +19,7 @@ const CONTRACT_NO = () => Math.floor(Math.random() * 90000) + 10000;
 export default function App() {
   const [apiKey, setApiKey] = useState(() => IS_DEV ? "dev" : (localStorage.getItem("anthropic_key") || ""));
   const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiError, setApiError] = useState("");
   const [step, setStep] = useState("form"); // form | loading | match | contract | signed
   const [formData, setFormData] = useState({ name: "", age: "", reason: "", wantedParents: "" });
   const [match, setMatch] = useState(null);
@@ -57,6 +58,7 @@ export default function App() {
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.age || !formData.reason) return;
+    setApiError("");
     setStep("loading");
 
     const texts = [
@@ -104,12 +106,13 @@ export default function App() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
           messages: [{ role: "user", content: prompt }],
         }),
       });
       const data = await res.json();
+      if (data.error) throw new Error(data.error.message || "שגיאת API");
       const text = data.content.map((b) => b.text || "").join("");
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
@@ -120,6 +123,7 @@ export default function App() {
       setTimeout(() => setStep("match"), 4600);
     } catch (e) {
       console.error(e);
+      setApiError(e.message || "משהו השתבש. נסה שוב.");
       setStep("form");
     }
   };
@@ -288,6 +292,7 @@ export default function App() {
           <button style={{ ...styles.btn, opacity: formData.name && formData.age && formData.reason ? 1 : 0.5 }} onClick={handleSubmit} disabled={!formData.name || !formData.age || !formData.reason}>
             🔍 מצא לי הורים חדשים!
           </button>
+          {apiError && <div style={styles.errorBox}>❌ {apiError}</div>}
           <div style={styles.disclaimer}>⚠️ שירות זה הוא בדיחה בלבד. ההורים שלך אוהבים אותך גם כשאתה מעצבן.</div>
         </div>
       )}
@@ -496,6 +501,7 @@ const styles = {
   field: { marginBottom: 16 },
   btn: { width: "100%", padding: "15px", background: "linear-gradient(135deg, #ff7043, #ff4081)", color: "#fff", border: "none", borderRadius: 16, fontSize: 17, fontFamily: "'Fredoka One', cursive", cursor: "pointer", letterSpacing: 0.5, boxShadow: "0 4px 16px rgba(255,64,129,0.3)", display: "block" },
   disclaimer: { textAlign: "center", fontSize: 12, color: "#bbb", marginTop: 14, lineHeight: 1.5 },
+  errorBox: { background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 12, padding: 12, fontSize: 13, color: "#c62828", marginTop: 12, textAlign: "center", lineHeight: 1.5 },
   loadTitle: { fontFamily: "'Fredoka One', cursive", fontSize: 24, color: "#ff7043", marginBottom: 8 },
   loadSub: { color: "#666", fontSize: 15, marginBottom: 24, minHeight: 24 },
   progressBar: { height: 10, background: "#ffd4c2", borderRadius: 99, overflow: "hidden", margin: "0 auto", maxWidth: 260 },
