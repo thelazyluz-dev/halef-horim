@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
 
+const IS_DEV = import.meta.env.DEV;
+
 const AVATARS = [
   "https://api.dicebear.com/7.x/adventurer/svg?seed=mom1&backgroundColor=ffdfbf",
   "https://api.dicebear.com/7.x/adventurer/svg?seed=dad1&backgroundColor=c0aede",
@@ -15,6 +17,8 @@ const TODAY = new Date().toLocaleDateString("he-IL");
 const CONTRACT_NO = () => Math.floor(Math.random() * 90000) + 10000;
 
 export default function App() {
+  const [apiKey, setApiKey] = useState(() => IS_DEV ? "dev" : (localStorage.getItem("anthropic_key") || ""));
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const [step, setStep] = useState("form"); // form | loading | match | contract | signed
   const [formData, setFormData] = useState({ name: "", age: "", reason: "", wantedParents: "" });
   const [match, setMatch] = useState(null);
@@ -90,9 +94,15 @@ export default function App() {
 }`;
 
     try {
-      const res = await fetch("/api/messages", {
+      const url = IS_DEV ? "/api/messages" : "https://api.anthropic.com/v1/messages";
+      const headers = { "Content-Type": "application/json", "anthropic-version": "2023-06-01" };
+      if (!IS_DEV) {
+        headers["x-api-key"] = apiKey;
+        headers["anthropic-dangerous-direct-browser-access"] = "true";
+      }
+      const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
@@ -177,6 +187,50 @@ export default function App() {
     canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
     setSignature("");
   };
+
+  const saveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed.startsWith("sk-ant-")) return;
+    localStorage.setItem("anthropic_key", trimmed);
+    setApiKey(trimmed);
+  };
+
+  if (!IS_DEV && !apiKey) {
+    return (
+      <div style={styles.root}>
+        <div style={styles.header}>
+          <div style={styles.logo}>👪 החלף הורים</div>
+          <div style={styles.tagline}>כי לפעמים צריך שדרוג</div>
+        </div>
+        <div style={styles.card} className="fadeIn">
+          <div style={styles.cardTitle}>🔑 הגדרה ראשונית</div>
+          <div style={styles.cardSub}>כדי להשתמש באפליקציה, הזן מפתח Anthropic API</div>
+          <div style={styles.field}>
+            <label>Anthropic API Key</label>
+            <input
+              placeholder="sk-ant-..."
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              type="password"
+              dir="ltr"
+            />
+          </div>
+          <button
+            style={{ ...styles.btn, opacity: apiKeyInput.startsWith("sk-ant-") ? 1 : 0.5 }}
+            disabled={!apiKeyInput.startsWith("sk-ant-")}
+            onClick={saveApiKey}
+          >
+            🚀 התחל!
+          </button>
+          <div style={styles.disclaimer}>
+            המפתח נשמר רק בדפדפן שלך ולא נשלח לשום שרת.{" "}
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "#ff7043" }}>קבל מפתח בחינם</a>
+          </div>
+        </div>
+        <style>{`.fadeIn { animation: fadeIn 0.5s ease forwards; } @keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.root}>
