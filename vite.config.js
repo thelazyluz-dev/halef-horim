@@ -1,7 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api.anthropic.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/v1'),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('x-api-key', process.env.ANTHROPIC_API_KEY || '')
+            proxyReq.setHeader('anthropic-version', '2023-06-01')
+            proxyReq.removeHeader('origin')
+          })
+        },
+      },
+    },
+  },
 })
