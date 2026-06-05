@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import html2canvas from "html2canvas";
 
 const AVATARS = [
   "https://api.dicebear.com/7.x/adventurer/svg?seed=mom1&backgroundColor=ffdfbf",
@@ -19,11 +20,36 @@ export default function App() {
   const [match, setMatch] = useState(null);
   const [percent, setPercent] = useState(0);
   const [loadingText, setLoadingText] = useState("");
+  const [checkedCount, setCheckedCount] = useState(0);
   const [signature, setSignature] = useState("");
   const [contractNo] = useState(CONTRACT_NO());
   const [drawing, setDrawing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const canvasRef = useRef(null);
   const lastPos = useRef(null);
+  const signedRef = useRef(null);
+  const countIntervalRef = useRef(null);
+
+  // Animated counter during loading
+  useEffect(() => {
+    if (step === "loading") {
+      const target = Math.floor(Math.random() * 700) + 300;
+      setCheckedCount(0);
+      countIntervalRef.current = setInterval(() => {
+        setCheckedCount((prev) => {
+          const next = prev + Math.floor(Math.random() * 12) + 3;
+          if (next >= target) {
+            clearInterval(countIntervalRef.current);
+            return target;
+          }
+          return next;
+        });
+      }, 80);
+    } else {
+      clearInterval(countIntervalRef.current);
+    }
+    return () => clearInterval(countIntervalRef.current);
+  }, [step]);
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.age || !formData.reason) return;
@@ -44,7 +70,7 @@ export default function App() {
       else clearInterval(interval);
     }, 900);
 
-    const prompt = `אתה מחולל הורים פיקטיביים לאפליקציה הומוריסטית לילדים. 
+    const prompt = `אתה מחולל הורים פיקטיביים לאפליקציה הומוריסטית לילדים.
 ילד בשם ${formData.name}, בן/בת ${formData.age}, רוצה להחליף הורים כי: "${formData.reason}".
 הוא/היא מחפש הורים שהם: "${formData.wantedParents || "לא פירט"}".
 
@@ -86,6 +112,27 @@ export default function App() {
       console.error(e);
       setStep("form");
     }
+  };
+
+  // Download signed contract as image
+  const downloadContract = async () => {
+    if (!signedRef.current) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(signedRef.current, { scale: 2, useCORS: true, backgroundColor: "#fff" });
+      const link = document.createElement("a");
+      link.download = `חוזה-הורים-${formData.name}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Share on WhatsApp
+  const shareWhatsApp = () => {
+    const msg = `🎉 החלפתי הורים!\n\n👩 ${match.momName} ו-👨 ${match.dadName} מ${match.location}\n"${match.tagline}"\n\nגם אתה/את רוצה לנסות? 👪\nhttps://github.com/thelazyluz-dev/halef-horim`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   // Canvas drawing
@@ -140,9 +187,11 @@ export default function App() {
         @keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes stamp { 0%{transform:scale(3) rotate(-15deg);opacity:0} 60%{transform:scale(0.9) rotate(-15deg);opacity:1} 100%{transform:scale(1) rotate(-15deg);opacity:1} }
         @keyframes confetti { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(80px) rotate(720deg);opacity:0} }
+        @keyframes countUp { from{opacity:0.4} to{opacity:1} }
         .bounce { animation: bounce 1s infinite; }
         .fadeIn { animation: fadeIn 0.5s ease forwards; }
         .stamp-anim { animation: stamp 0.5s cubic-bezier(.17,.67,.35,1.2) forwards; }
+        .count-flash { animation: countUp 0.1s ease; }
         input, textarea {
           font-family: 'Rubik', sans-serif; font-size: 15px;
           border: 2px solid #ffd4c2; border-radius: 14px; padding: 12px 16px;
@@ -196,7 +245,10 @@ export default function App() {
           <div style={styles.loadTitle}>מחפשים הורים...</div>
           <div style={styles.loadSub}>{loadingText}</div>
           <div style={styles.progressBar}><div style={styles.progressFill} /></div>
-          <div style={{ fontSize: 13, color: "#aaa", marginTop: 16 }}>בודקים {Math.floor(Math.random() * 900) + 100} זוגות הורים במאגר</div>
+          <div style={styles.counterWrap}>
+            <span style={styles.counterNum}>{checkedCount.toLocaleString("he-IL")}</span>
+            <span style={styles.counterLabel}> זוגות הורים נבדקו עד כה</span>
+          </div>
         </div>
       )}
 
@@ -247,7 +299,6 @@ export default function App() {
       {step === "contract" && match && (
         <div className="fadeIn">
           <div style={styles.contractWrap}>
-            {/* Official header */}
             <div style={styles.contractHeader}>
               <div style={styles.contractSeal}>⚖️</div>
               <div style={styles.contractTitle}>חוזה העברת הורות רשמי</div>
@@ -280,7 +331,6 @@ export default function App() {
                 <span>ההורים הביולוגיים יישמרו בארכיון ויוחזרו במקרה של חרטה תוך 30 שנים.</span>
               </div>
 
-              {/* Signature area */}
               <div style={styles.sigSection}>
                 <div style={styles.sigLabel}>חתימת הילד/ה — "{formData.name}"</div>
                 <div style={styles.canvasWrap}>
@@ -322,7 +372,6 @@ export default function App() {
       {step === "signed" && match && (
         <div className="fadeIn">
           <div style={styles.card}>
-            {/* Confetti dots */}
             <div style={{ position: "relative", height: 0 }}>
               {["🎊","🎉","⭐","🎈","✨"].map((e, i) => (
                 <span key={i} style={{
@@ -335,32 +384,42 @@ export default function App() {
               ))}
             </div>
 
-            {/* Stamped contract preview */}
-            <div style={styles.signedDoc}>
-              <div style={styles.stampWrap}>
-                <div className="stamp-anim" style={styles.stamp}>
-                  <div style={{ fontSize: 26 }}>✅</div>
-                  <div style={styles.stampText}>אושר!</div>
+            {/* Capturable section */}
+            <div ref={signedRef} style={{ background: "#fff", padding: "8px 0" }}>
+              <div style={styles.signedDoc}>
+                <div style={styles.stampWrap}>
+                  <div className="stamp-anim" style={styles.stamp}>
+                    <div style={{ fontSize: 26 }}>✅</div>
+                    <div style={styles.stampText}>אושר!</div>
+                  </div>
                 </div>
-              </div>
-              <div style={styles.signedTitle}>החוזה נחתם בהצלחה!</div>
-              <div style={styles.signedSub}>מס׳ {contractNo}</div>
+                <div style={styles.signedTitle}>החוזה נחתם בהצלחה!</div>
+                <div style={styles.signedSub}>מס׳ {contractNo}</div>
 
-              <div style={styles.signedParents}>
-                <img src={match.momAvatar} style={styles.signedAvatar} alt="mom" />
-                <div style={{ fontSize: 20 }}>❤️</div>
-                <img src={match.dadAvatar} style={styles.signedAvatar} alt="dad" />
-              </div>
+                <div style={styles.signedParents}>
+                  <img src={match.momAvatar} style={styles.signedAvatar} alt="mom" />
+                  <div style={{ fontSize: 20 }}>❤️</div>
+                  <img src={match.dadAvatar} style={styles.signedAvatar} alt="dad" />
+                </div>
 
-              <div style={styles.signedNames}>{match.momName} & {match.dadName}</div>
-              <div style={{ fontSize: 13, color: "#999", marginBottom: 4 }}>מ{match.location}</div>
-              <div style={styles.signedMsg}>
-                מזל טוב {formData.name}! ההורים החדשים שלך יגיעו אליך תוך 3-5 ימי עסקים. 📦<br />
-                <span style={{ fontSize: 12 }}>(אוקי, זו בדיחה. אבל ההורים שלך אוהבים אותך 💙)</span>
+                <div style={styles.signedNames}>{match.momName} & {match.dadName}</div>
+                <div style={{ fontSize: 13, color: "#999", marginBottom: 4 }}>מ{match.location}</div>
+                <div style={styles.signedMsg}>
+                  מזל טוב {formData.name}! ההורים החדשים שלך יגיעו אליך תוך 3-5 ימי עסקים. 📦<br />
+                  <span style={{ fontSize: 12 }}>(אוקי, זו בדיחה. אבל ההורים שלך אוהבים אותך 💙)</span>
+                </div>
               </div>
             </div>
 
-            <div style={styles.btnRow}>
+            <div style={{ ...styles.btnRow, marginTop: 12 }}>
+              <button style={{ ...styles.btn, background: "#25D366" }} onClick={shareWhatsApp}>
+                📱 שתף בוואטסאפ
+              </button>
+              <button style={{ ...styles.btn, background: "#5c6bc0" }} onClick={downloadContract} disabled={downloading}>
+                {downloading ? "⏳ שומר..." : "📥 הורד תמונה"}
+              </button>
+            </div>
+            <div style={{ marginTop: 10 }}>
               <button style={{ ...styles.btn, background: "#ff7043" }} onClick={() => { setStep("form"); setMatch(null); setSignature(""); clearCanvas(); }}>
                 🔄 פרסם ילד אחר
               </button>
@@ -387,6 +446,9 @@ const styles = {
   loadSub: { color: "#666", fontSize: 15, marginBottom: 24, minHeight: 24 },
   progressBar: { height: 10, background: "#ffd4c2", borderRadius: 99, overflow: "hidden", margin: "0 auto", maxWidth: 260 },
   progressFill: { height: "100%", background: "linear-gradient(90deg, #ff7043, #ff4081)", borderRadius: 99, width: "85%", transition: "width 4.5s ease" },
+  counterWrap: { marginTop: 20, fontSize: 14, color: "#aaa" },
+  counterNum: { fontFamily: "'Fredoka One', cursive", fontSize: 28, color: "#ff7043" },
+  counterLabel: { fontSize: 13, color: "#bbb" },
   matchBanner: { textAlign: "center", padding: "20px 16px", background: "linear-gradient(135deg, #ff7043, #ff4081)", margin: "0 16px 16px", borderRadius: 20, boxShadow: "0 4px 16px rgba(255,64,129,0.3)" },
   matchTitle: { fontFamily: "'Fredoka One', cursive", fontSize: 26, color: "#fff", marginTop: 4 },
   parentsRow: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16 },
